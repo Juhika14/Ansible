@@ -1,0 +1,187 @@
+
+
+    2  sudo apt update 
+    3  clear
+    4  sudo apt update && sudo apt install software-properties-common && sudo add-apt-repository --yes --update ppa:ansible/ansible && sudo apt install ansible -y
+    5  clear
+    6  ansible --version 
+    7  clear
+    8  ssh-keygen
+    9  sudo cat .ssh/id_rsa.pub
+    
+Slave machine ( S1 & S2)
+
+sudo nano .ssh/authorized_keys 
+cat .ssh/authorized_keys 
+
+Master Machine: 
+
+cd /etc/ansible 
+sudo nano hosts
+Slave1 ansible_hosts=ip 
+Slave2 ansible_hosts=ip 
+
+
+Playbook For Installing Apache2 in Slave 1 and Nginx in Slave 2
+
+---
+ - name: Install Apache2 in Slave1
+   hosts: Slave1
+   become: true
+   tasks:
+    - name: Installing Apache2
+      apt: name=apache2 update_cache=yes state=latest
+
+ - name: Install nginx on Slave2
+   hosts: Slave2
+   become: true
+   tasks:
+    - name: Installing Nginx
+      apt: name=nginx update_cache=yes state=latest
+      
+Slave 1 
+
+sudo service apache2 start 
+
+Slave 2
+
+sudo service nginx start 
+
+In Master Machine
+
+sudo nano index.html 
+<h1> My Custom Page </h1><br>
+Thank you !!
+      
+
+custom.yml
+
+---
+ - name: Replacing Apache 2 default page
+   hosts: Slave1
+   become: true
+   tasks:
+    - name: Replace the Page
+      copy: src=./index.html dest=/var/www/html/index.html
+ - name: Replacing Nginx  default page
+   hosts: Slave2
+   become: true
+   tasks:
+    - name: Replace the Page
+      copy: src=./index.html dest=/var/www/html/index.html
+      
+Ansible Roles 
+
+49  cd /etc/ansible/
+   51  cd roles/
+   57  sudo ansible-galaxy init demo --offline
+   62  cd demo/
+   64  cd tasks/
+   67  sudo nano java.yaml
+---
+ - name: Install Java
+   become: true
+   apt: name=openjdk-17-jdk update_cache=yes state=latest
+   
+   68  ls 
+   69  sudo nano main.yml 
+---
+# tasks file for demo
+ - include_tasks: java.yaml
+   
+   70  ls 
+   71  cat java.yaml 
+   72  cat main.yml 
+   73  cd 
+   74  sudo nano Install-java.yaml
+---
+ - hosts: localhost
+   become: true
+   roles:
+    - demo
+    
+   75  ansible-playbook Install-java.yaml --check 
+   76  ansible-playbook Install-java.yaml 
+   77  java --version
+
+Role 1
+sudo ansible-galaxy init Role1 
+java.yml 
+---
+ - name: Install Java
+   apt: name=openjdk-11-jdk update_cache=yes state=latest
+   
+nginx.yaml 
+---
+ - name: Install Nginx
+   apt: name=nginx update_cache=yes state=latest
+   
+start-nginx.yml 
+---
+ - name: Start Nignx service
+   become: true
+   service: name=nginx state=started
+   notify:
+    - Start NGINX
+---
+# tasks file for Role1
+ - include_tasks: java.yml
+ - include_tasks: nginx.yaml
+ - include_tasks: start-nginx.yml
+
+ubuntu@ip-172-31-82-238:/etc/ansible/roles/Role1/handlers$ cat main.yml 
+---
+# handlers file for Role1
+ - name: Start Nginx
+   service: name=nginx state=started
+   become: true
+   
+   
+Role 2 
+
+sudo ansible-galaxy init Role2
+
+apache2.yml 
+---
+ - name: Intall Apache2
+   apt: name=apache2 update_cache=yes state=latest
+   
+   
+mysql.yml 
+---
+ - name: Intall MySQL
+   apt: name=mysql-server update_cache=yes state=latest
+   
+start-apache2.yml 
+---
+ - name: Start Apache2
+   become: true
+   service: name=apache2 state=started
+   notify:
+    - Start Apache2
+main.yml 
+---
+# tasks file for Role2
+ - include_tasks: mysql.yml
+ - include_tasks: apache2.yml
+ - include_tasks: start-apache2.yml
+
+ubuntu@ip-172-31-82-238:/etc/ansible/roles/Role2/handlers$ cat main.yml 
+---
+# handlers file for Role2
+ - name: Start Apache2
+   become: true
+   service: name=apache2 state=started
+
+
+ubuntu@ip-172-31-82-238:~$ cat final.yml 
+---
+ - hosts: Slave1
+   become: true
+   roles:
+    - Role1
+
+ - hosts: Slave2
+   become: true
+   roles:
+    - Role2
